@@ -1,0 +1,199 @@
+# config.yaml
+
+# --- General Settings ---
+project_name: "gi_tract_segmentation"
+seed: 42
+device: "cuda:0" # Specify GPU or "cpu"
+base_dir: "." # Project root directory
+output_dir: ${base_dir}/output # Main output directory for folds
+fold: 0 # Current fold for cross-validation
+
+# --- Data Settings ---
+data:
+  raw_data_dir: "../uw-madison-gi-tract-image-segmentation" # Relative path to raw Kaggle data
+  train_csv: ${data.raw_data_dir}/train.csv
+  # Option 1: Use preprocessed 3D NIfTI files (Recommended based on examples)
+  use_preprocessed_3d: True
+  preprocessed_dir: ${base_dir}/preprocessed_data/fold_${fold} # Directory for NIfTI files
+  # data_list_json: ${data.preprocessed_dir}/dataset_fold_${fold}.json # Path to JSON file listing NIfTI files (created by preprocess_data.py)
+  # Option 2: Process 2D PNGs directly (Alternative, might need different transforms/model)
+  # base_image_dir: ${data.raw_data_dir}/train
+  num_classes: 3
+  class_names: ["large_bowel", "small_bowel", "stomach"]
+  # train_val_split: 0.8 # Used by preprocess_data.py or if using 2D directly
+
+# --- Preprocessing (Applied in preprocess_data.py if use_preprocessed_3d=True, or in Dataset otherwise) ---
+# Note: Many transforms from cfg_unet_multilabel.py are for 3D NIfTI input
+preprocessing_3d: # Transforms applied during NIfTI creation OR at Dataset loading if using NIfTI
+  load:
+    - name: LoadImaged
+      params: { keys: ["image", "mask"], image_only: false } # reader: NibabelReader if needed
+  channel:
+    - name: EnsureChannelFirstd
+      params: { keys: ["image", "mask"] }
+  orientation_spacing: # Optional: Standardize orientation and spacing if needed
+    - name: Spacingd
+      params: { keys: ["image", "mask"], pixdim: [1.5, 1.5, 3.0], mode: ["bilinear", "nearest"] } # Example spacing, verify actual
+    - name: Orientationd
+      params: { keys: ["image", "mask"], axcodes: "RAS" } # Example orientation
+  intensity:
+    - name: ScaleIntensityRanged # Example normalization
+      params: { keys: ["image"], a_min: 0.0, a_max: 65535.0, b_min: 0.0, b_max: 1.0, clip: True } # Adjust a_max based on NIfTI range
+    # - name: NormalizeIntensityd
+    #   params: { keys: ["image"], nonzero: True, channel_wise: True }
+
+# --- Augmentations (Applied during Training DataLoader) ---
+augmentation:
+  # Spatial Augmentations
+  spatial:
+    - name: RandSpatialCropd # Or RandCropByPosNegLabeld
+      params: { keys: ["image", "mask"], roi_size: [160, 160, 80], random_size: false } # Example ROI size
+    - name: RandFlipd
+      params: { keys: ["image", "mask"], prob: 0.5, spatial_axis: [0] }
+    - name: RandFlipd
+      params: { keys: ["image", "mask"], prob: 0.5, spatial_axis: [1] }
+    # - name: RandFlipd # Optional Z-flip
+    #   params: { keys: ["image", "mask"], prob: 0.5, spatial_axis: [2] }
+    - name: RandAffined # Example affine
+      params:
+        keys: ["image", "mask"]
+        prob: 0.5
+        rotate_range: [0.26, 0.26, 0] # Radians (~15 deg) for xy axes
+        translate_range: [10, 10, 5] # Pixels
+        scale_range: [0.1, 0.1, 0.1] # Percentage deviation
+        mode: ["bilinear", "nearest"]
+        padding_mode: "reflection"
+
+  # Intensity Augmentations
+  intensity:
+    - name: RandScaleIntensityd
+      params: { keys: ["image"], factors: 0.2, prob: 0.5 } #
+    - name: RandShiftIntensityd
+      params: { keys: ["image"], offsets: 0.1, prob: 0.5 } #
+    - name: RandGaussianNoised # Example
+      params: { keys: ["image"], prob: 0.1, mean: 0.0, std: 0.01 }
+
+  # Other Augmentations (Use OneOf or individual probabilities)
+  other:
+    - name: OneOf # Example OneOf
+      transforms:
+        - name: RandGridDistortiond
+          params: { keys: ["image", "mask"], prob: 1.0, distort_limit: [-0.05, 0.05], mode: ["bilinear", "nearest"], padding_mode: "reflection" }
+        - name: RandCoarseDropoutd
+          params: { keys: ["image", "mask"], holes: 5, max_holes: 8, spatial_size: [1, 1, 1], max_spatial_size: [12, 12, 12], fill_value: 0.0, prob: 1.0 }
+      weights: [0.5, 0.5] # Probabilities for each transform in OneOf
+
+# --- Validation Transforms (Minimal augmentation) ---
+validation_transforms:
+  # Typically includes loading, channel, intensity scaling like preprocessing_3d, and EnsureTyped
+  intensity: # Example
+    - name: ScaleIntensityRanged
+      params: { keys: ["image"], a_min: 0.0, a_max: 65535.0, b_min: 0.0, b_max: 1.0, clip: True } # Match training
+  # roi_size: [224, 224, 80] # ROI for validation/inference sliding window
+
+# --- Model Settings ---
+model:
+  name: "UNet" # MONAI model name
+  params:
+    spatial_dims: 3
+    in_channels: 1
+    out_channels: ${data.num_classes} # 3 classes
+    channels: [32, 64, 128, 256, 512] # Example channel depths
+    strides: [2, 2, 2, 2] # Example strides
+    kernel_size: 3
+    up_kernel_size: 3
+    num_res_units: 2
+    act: "PRELU"
+    norm: "BATCH"
+    dropout: 0.2 #
+    bias: True
+
+# --- Training Settings ---
+training:
+  epochs: 500 # Example, adjust as needed
+  batch_size: 2 # Adjust based on GPU memory
+  optimizer:
+    name: "Adam" # Or Novograd
+    params:
+      lr: 0.0001 #
+      weight_decay: 0.000001 #
+  loss_function:
+    name: "DiceCELoss" # Or DiceBceMultilabelLoss
+    params: # Parameters for DiceCELoss
+      to_onehot_y: False # Labels are already C,H,W,D
+      sigmoid: True # Use Sigmoid for multi-label output
+      include_background: True # Usually True when not using softmax/to_onehot
+      # squared_pred: True
+      # smooth_nr: 0.01
+      # smooth_dr: 0.01
+      # batch: True # Use if DiceLoss portion should be batched
+    # params: # Parameters for DiceBceMultilabelLoss
+    #   w_dice: 0.5
+    #   w_bce: 0.5
+  lr_scheduler:
+    # name: "CosineAnnealingLR"
+    # params:
+    #   T_max: ${training.epochs}
+    #   eta_min: ${training.optimizer.params.lr} * 0.01 # Example min_lr
+    name: "CosineAnnealingWarmRestarts" # used WarmupCosineSchedule, this is similar
+    params:
+      T_0: 100 # Restart interval in epochs used restart_epoch
+      T_mult: 1
+      eta_min: ${training.optimizer.params.lr} * 0.01 #
+  # warmup_epochs: 5 # Optional: Number of warmup epochs
+  gradient_accumulation_steps: 1 # Increase if batch size is limited by memory
+  mixed_precision: True # Use AMP
+  # --- Validation Settings ---
+  run_validation: True
+  validation_interval: 5 # Run validation every N epochs used eval_epochs
+  val_batch_size: 1 # Usually 1 for 3D sliding window
+  val_roi_size: [160, 160, 80] # ROI size for sliding window validation roi_size
+  val_sw_batch_size: 4 # Sliding window batch size sw_batch_size
+  val_overlap: 0.5 # Sliding window overlap
+  val_mode: "gaussian" # Sliding window blend mode ("constant" or "gaussian")
+  run_tta_val: False # Whether to use Test Time Augmentation during validation
+  # --- Checkpoint Settings ---
+  checkpoint_dir: ${output_dir}/fold_${fold}/checkpoints
+  save_interval: 50 # Save checkpoint every N epochs
+  save_best_metric: "combined_score" # Metric to monitor for best checkpoint ("dice", "hausdorff", "combined_score")
+  greater_is_better: True
+  load_checkpoint: null # Path to a specific checkpoint to resume training, e.g., "${training.checkpoint_dir}/latest.pth"
+  load_best_at_end: True # Load best model weights at the end of training
+  # --- Logging ---
+  log_dir: ${output_dir}/fold_${fold}/logs # For TensorBoard
+  log_interval: 10 # Log training loss every N steps
+
+# --- Inference Settings ---
+inference:
+  checkpoint_path: ${output_dir}/fold_${fold}/checkpoints/best_model.pth # Path to the trained model for inference
+  mode: "test" # "test" (process test set) or "predict" (process specific files)
+  # test_dir: ${data.raw_data_dir}/test # Directory containing test images (if mode="test")
+  # predict_files: [] # List of file paths or dicts if mode="predict"
+  output_dir: ${output_dir}/fold_${fold}/predictions # Where to save predictions
+  save_nifti: False # Save predictions as NIfTI files (besides submission CSV)
+  batch_size: 1 # Should match val_batch_size usually
+  roi_size: ${training.val_roi_size}
+  sw_batch_size: ${training.val_sw_batch_size}
+  overlap: ${training.val_overlap}
+  mode: ${training.val_mode}
+  run_tta: True # Use TTA during final inference
+  submission_filename: "submission.csv"
+
+# --- Postprocessing (Applied after inference activation/thresholding) ---
+postprocessing:
+  activation: "sigmoid" # "sigmoid" or "softmax" - applied before thresholding
+  threshold: 0.5
+  # Transforms applied after thresholding
+  mask_transforms:
+    - name: KeepLargestConnectedComponentd # Example postprocessing
+      params: { keys: ["pred"], applied_labels: [0, 1, 2], is_onehot: False } # Applied_labels assumes 0=LB, 1=SB, 2=ST
+
+# --- Evaluation Metrics ---
+evaluation:
+  metrics: ["DiceMetric", "HausdorffScore"] # Or custom metric names
+  hausdorff_percentile: 95 # For computing HD95 if using MONAI's default
+  include_background: False # For Dice calculation
+  reduction: "mean_batch" # How to average metrics
+  score_weights: # Weights for combining metrics for leaderboard/best model saving
+    dice: 0.4
+    hausdorff: 0.6

@@ -1,0 +1,12 @@
+torch>=1.10 # Check MONAI compatibility
+monai>=1.0 # Or specific version used in examples (e.g., 0.8.1)
+pandas
+numpy
+pyyaml
+python-box
+scikit-image
+simpleitk
+tqdm
+scipy # For Hausdorff distance calculation if needed
+tensorboard
+# Add other specific dependencies if needed
