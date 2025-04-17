@@ -2,7 +2,7 @@
 
 # --- General Settings ---
 project_name: "gi_tract_segmentation"
-seed: 42
+seed: 123
 device: "cuda:0" # Specify GPU or "cpu"
 base_dir: "." # Project root directory
 output_dir: ${base_dir}/output # Main output directory for folds
@@ -97,7 +97,7 @@ model:
   params:
     spatial_dims: 3
     in_channels: 1
-    out_channels: ${data.num_classes} # 3 classes
+    out_channels: 3 # 3 classes ${data.num_classes}
     channels: [32, 64, 128, 256, 512] # Example channel depths
     strides: [2, 2, 2, 2] # Example strides
     kernel_size: 3

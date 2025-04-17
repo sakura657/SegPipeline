@@ -1,5 +1,5 @@
-torch>=1.10 # Check MONAI compatibility
-monai>=1.0 # Or specific version used in examples (e.g., 0.8.1)
+torch # Check MONAI compatibility
+monai # Or specific version used in examples (e.g., 0.8.1)
 pandas
 numpy
 pyyaml

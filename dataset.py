@@ -32,6 +32,13 @@ def get_datasets(config):
     train_ts = get_train_transforms(config)
     val_ts = get_val_transforms(config)
 
+    # --- ADD DEBUG PRINTS HERE ---
+    # print(f"DEBUG get_datasets: Type of train_ts = {type(get_train_transforms(config))}")
+    # print(f"DEBUG get_datasets: Value of train_ts = {get_train_transforms(config)}")
+    # print(f"DEBUG get_datasets: Type of val_ts = {type(get_val_transforms(config))}")
+    # print(f"DEBUG get_datasets: Value of val_ts = {get_val_transforms(config)}")
+    # --- END DEBUG PRINTS ---
+
     # Choose Dataset type based on config
     dataset_type = config.data.get('dataset_type', 'CacheDataset').lower()
     train_cache_rate = config.data.get('train_cache_rate', 1.0)

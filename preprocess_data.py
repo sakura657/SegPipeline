@@ -13,7 +13,7 @@ import random
 import json
 
 # Import RLE and path functions from utils.py
-from utils import rle_decode, load_config, parse_filepath_info, construct_path_from_info
+from utils import rle_decode, load_config, parse_filepath_info
 
 def create_nifti_volume(group_df, config):
     """
@@ -123,11 +123,23 @@ def main(config_path, target_fold=None):
     df = pd.read_csv(os.path.join(config.base_dir, config.data.train_csv))
 
     print("Preprocessing DataFrame...")
-    # 1. Add case, day, slice_id from 'id'
-    df[["case_id_str", "day_num_str", "slice_id"]] = df["id"].str.split("_", expand=True)
+    # 1. Extract case, day, slice_id using pandas .str.extract()
+    # Regex captures: (caseXXX), (day number), (slice number)
+    parsed_ids = df["id"].str.extract(r"(case\d+)_day(\d+)_slice_(\d+)", expand=True)
+
+    # Assign captured groups to new columns
+    df["case_id_str"] = parsed_ids[0]
+    df["day_num_str"] = "day" + parsed_ids[1] # Add "day" prefix
+    df["slice_id"] = parsed_ids[2] # Keep as object for now to handle potential NaNs
+
+    # Drop rows where regex did not match (resulting in NaN)
+    original_len = len(df)
+    df = df.dropna(subset=["case_id_str", "day_num_str", "slice_id"])
+    if len(df) < original_len:
+        logging.warning(f"Dropped {original_len - len(df)} rows due to ID format mismatch.")
+
+    # Convert slice_id to integer *after* dropping NaNs
     df["slice_id"] = df["slice_id"].astype(int)
-    df["case_id_str"] = df["case_id_str"].str.replace("case","case") # Keep 'case' prefix for consistency
-    df["day_num_str"] = df["day_num_str"].str.replace("day","day") # Keep 'day' prefix
 
     # 2. Find all image paths
     print("Finding image files...")

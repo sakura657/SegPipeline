@@ -1,0 +1,123 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class$
+
+# C extensions
+*.so
+
+# Distribution / packaging
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+pip-wheel-metadata/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# PyInstaller
+# Usually these files are written by a python script from a template
+# before PyInstaller builds the exe, so as to inject date/other infos into it.
+*.manifest
+*.spec
+
+# Installer logs
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Unit test / coverage reports
+htmlcov/
+.tox/
+.nox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+*.py,cover
+.hypothesis/
+.pytest_cache/
+cover/
+
+# Environments (e.g., venv, conda)
+.env
+.venv
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# Spyder project settings
+.spyderproject
+.spyproject
+
+# Rope project settings
+.ropeproject
+
+# mkdocs documentation
+/site
+
+# Jupyter Notebook checkpoints
+.ipynb_checkpoints
+
+# IDE / Editor specific files
+.idea/
+.vscode/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw? # Vim swap files
+
+# OS generated files
+.DS_Store # macOS
+Thumbs.db # Windows
+._*
+
+# Logs and Databases (if not in output/)
+*.log
+*.sql
+*.sqlite
+
+# Temporary files
+*.tmp
+*.temp
+*~
+
+# Data files
+# --- Specific to your project ---
+# Raw Data (adjust path if it's outside SegPipeline folder)
+# Example if raw data is sibling to SegPipeline: ../uw-madison-gi-tract-image-segmentation/
+# Example if raw data is inside SegPipeline (less common): uw-madison-gi-tract-image-segmentation/
+# Add the correct relative path from .gitignore location to your raw data folder
+# ../uw-madison-gi-tract-image-segmentation/  <-- ADJUST THIS PATH!
+
+# Preprocessed data
+preprocessed_data/
+
+# Data Cache (for PersistentDataset)
+data_cache/
+
+# Output directory (logs, checkpoints, predictions)
+output/
+
+# Temporary config files created during runtime
+temp_*.yaml
+
+# Add any other large files or generated content
+# *.pth # Maybe too broad, but useful if large model files are elsewhere
+# *.nii.gz # Be careful if you have NIfTI files you *do* want to track
